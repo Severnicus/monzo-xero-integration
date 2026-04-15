@@ -11,7 +11,8 @@ const XERO_BANK_ACCOUNT_CODE = process.env.XERO_BANK_ACCOUNT_CODE;
 const XERO_ACCOUNT_CODE = process.env.XERO_ACCOUNT_CODE;
 
 export const handler = async (event) => {
-    console.log('Received event:', JSON.stringify(event, null, 2));
+    console.log('Received event');
+    let xeroPayload;
 
     try {
         const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || event;
@@ -23,19 +24,13 @@ export const handler = async (event) => {
         }
 
         const transaction = body.data;
-        console.log('Monzo transaction:', JSON.stringify(transaction, null, 2));
-
-        const xeroPayload = mapToXeroBankTransaction(transaction);
-        console.log('Xero payload:', JSON.stringify(xeroPayload, null, 2));
-
+        xeroPayload = mapToXeroBankTransaction(transaction);
         const xeroResult = await sendToXero(xeroPayload);
         console.log('Xero result:', JSON.stringify(xeroResult, null, 2));
 
-        await sendNotificationEmail(xeroPayload);
-
         return response(200, { message: 'Transaction processed', transactionId: transaction.id });
     } catch (error) {
-        console.error('Error processing webhook:', error);
+        await sendFailureNotificationEmail(error, xeroPayload);
         // Always return 200 to prevent Monzo retry storms
         return response(200, { message: 'Error processing webhook', error: error.message });
     }
