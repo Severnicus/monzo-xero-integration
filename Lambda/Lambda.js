@@ -31,7 +31,7 @@ export const handler = async (event) => {
 
         return response(200, { message: 'Transaction processed', transactionId: transaction.id });
     } catch (error) {
-        await sendFailureNotificationEmail(error, xeroPayload);
+        await sendNotificationEmail(error, xeroPayload);
         // Always return 200 to prevent Monzo retry storms
         return response(200, { message: 'Error processing webhook', error: error.message });
     }
@@ -159,7 +159,7 @@ async function sendToXero(xeroPayload) {
     return await xeroResponse.json();
 }
 
-async function sendNotificationEmail(xeroPayload) {
+async function sendNotificationEmail(error, xeroPayload) {
     if (!NOTIFICATION_EMAIL || !SENDER_EMAIL) {
         console.warn('Email not configured — skipping notification. Set NOTIFICATION_EMAIL and SENDER_EMAIL env vars.');
         return;
@@ -167,8 +167,14 @@ async function sendNotificationEmail(xeroPayload) {
 
     const amount = xeroPayload.LineItems[0].UnitAmount;
     const direction = xeroPayload.Type === 'SPEND' ? 'spent' : 'received';
-    const subject = `Monzo: £${amount} ${direction} — ${xeroPayload.Contact.Name}`;
-    const bodyText = JSON.stringify(xeroPayload, null, 2);
+    const subject = `Monzo-Xero - Failed to send transaction: £${amount} ${direction} — ${xeroPayload.Contact.Name}`;
+    const bodyText = [
+        `Error: ${error.message}`,
+        error.stack ? `Stack:\n${error.stack}` : '',
+        `Xero Payload:\n${xeroPayload ? JSON.stringify(xeroPayload, null, 2) : 'No payload available'}`,
+    ]
+        .filter(Boolean)
+        .join('\n\n');
 
     const command = new SendEmailCommand({
         Source: SENDER_EMAIL,
