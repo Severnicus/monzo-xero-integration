@@ -1,15 +1,14 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SSMClient, GetParameterCommand, PutParameterCommand } from '@aws-sdk/client-ssm';
 
-// Email service
-const ses = new SESClient();
-// Systems manager parameter store
-const ssm = new SSMClient();
+const ses = new SESClient(); // Email service
+const ssm = new SSMClient(); // Systems manager parameter store
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL;
 const SENDER_EMAIL = process.env.SENDER_EMAIL;
 const XERO_BANK_ACCOUNT_CODE = process.env.XERO_BANK_ACCOUNT_CODE;
 const XERO_ACCOUNT_CODE = process.env.XERO_ACCOUNT_CODE;
 const ACCESS_TOKEN_TTL_BUFFER = 300000;
+const MONZO_SUCCESS_RESPONSE = 200; // Always return 200 to prevent Monzo retry storms
 
 export const handler = async (event) => {
     console.log('Received event');
@@ -21,7 +20,7 @@ export const handler = async (event) => {
 
         if (eventType !== 'transaction.created') {
             console.log(`Ignoring event type: ${eventType}`);
-            return response(200, { message: `Ignored event type: ${eventType}` });
+            return response(MONZO_SUCCESS_RESPONSE, { message: `Ignored event type: ${eventType}` });
         }
 
         const transaction = body.data;
@@ -30,11 +29,11 @@ export const handler = async (event) => {
         // xeroPayload does not contain PII
         await sendToXero(xeroPayload);
 
-        return response(200, { message: 'Transaction processed', transactionId: transaction.id });
+        return response(MONZO_SUCCESS_RESPONSE, { message: 'Transaction processed', transactionId: transaction.id });
     } catch (error) {
         await sendNotificationEmail(error, xeroPayload);
-        // Always return 200 to prevent Monzo retry storms
-        return response(200, { message: 'Error processing webhook', error: error.message });
+        
+        return response(MONZO_SUCCESS_RESPONSE, { message: 'Error processing webhook', error: error.message });
     }
 };
 
