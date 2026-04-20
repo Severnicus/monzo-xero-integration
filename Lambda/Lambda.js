@@ -158,17 +158,17 @@ async function updateTokens(tokens)
     const tokenExpiry = tokens.expires_in * 1000;
 
     const expiresAtResult = await putSSMParameter('xero-access-token-expires-at', `${Date.now() + tokenExpiry}`);
-    if (expiresAtResult.Version > 0) {
+    if (expiresAtResult.Version == 0) {
         failures.push('Failed to update token expiry');
     }
 
     const accessTokenResult = await putSSMParameter('xero-access-token', tokens.access_token, true);
-    if (accessTokenResult.Version > 0) {
+    if (accessTokenResult.Version == 0) {
         failures.push('Failed to update access token');
     }
 
     const refreshResult = await putSSMParameter('xero-api-refresh-token', tokens.refresh_token, true);
-    if (refreshResult.Version > 0) {
+    if (refreshResult.Version == 0) {
         failures.push('Failed to update refresh token');
     }
 
