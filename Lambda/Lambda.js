@@ -9,7 +9,7 @@ const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL;
 const SENDER_EMAIL = process.env.SENDER_EMAIL;
 const XERO_BANK_ACCOUNT_CODE = process.env.XERO_BANK_ACCOUNT_CODE;
 const XERO_ACCOUNT_CODE = process.env.XERO_ACCOUNT_CODE;
-const ACCESS_TOKEN_TTL_BUFFER = 300000; 
+const ACCESS_TOKEN_TTL_BUFFER = 300000;
 
 export const handler = async (event) => {
     console.log('Received event');
@@ -37,6 +37,8 @@ export const handler = async (event) => {
         return response(200, { message: 'Error processing webhook', error: error.message });
     }
 };
+
+// #region Transaction mapper
 
 function mapToXeroBankTransaction(tx) {
     if (tx == null){
@@ -87,6 +89,10 @@ function buildLineItemDescription(tx) {
     }
     return parts.filter(Boolean).join(' | ');
 }
+
+// #endregion
+
+// #region Token management
 
 async function getSSMParameter(name, withDecryption = false) {
     const command = new GetParameterCommand({
@@ -151,6 +157,8 @@ async function getXeroAccessToken() {
 
     return tokens.access_token;
 }
+
+// #endregion
 
 async function sendToXero(xeroPayload) {
     const accessToken = await getXeroAccessToken();
