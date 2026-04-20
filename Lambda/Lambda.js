@@ -31,6 +31,7 @@ export const handler = async (event) => {
 
         return response(MONZO_SUCCESS_RESPONSE, { message: 'Transaction processed', transactionId: transaction.id });
     } catch (error) {
+        console.log(error);
         await sendNotificationEmail(error, xeroPayload);
         
         return response(MONZO_SUCCESS_RESPONSE, { message: 'Error processing webhook', error: error.message });
@@ -109,7 +110,7 @@ async function putSSMParameter(name, value, secure = false) {
         Type: secure ? 'SecureString' : 'String',
         Overwrite: true,
     });
-    await ssm.send(command);
+    return await ssm.send(command);
 }
 
 async function getXeroAccessToken() {
@@ -143,18 +144,39 @@ async function getXeroAccessToken() {
     }
 
     const tokens = await tokenResponse.json();
-    console.log('Xero access token refreshed');
+    await updateTokens(tokens);
 
-    await putSSMParameter('xero-access-token', tokens.access_token, true);
-    await putSSMParameter('xero-api-refresh-token', tokens.refresh_token, true);
+    return tokens.access_token;
+}
+
+async function updateTokens(tokens)
+{
+    // Attempt each update and group failures
+    const failures = [];
 
     // expires_in always expressed in seconds according to Xero's API docs
     const tokenExpiry = tokens.expires_in * 1000;
-    await putSSMParameter('xero-access-token-expires-at', `${Date.now() + tokenExpiry}`);
 
-    console.log('Xero refresh token updated in SSM');
+    const expiresAtResult = await putSSMParameter('xero-access-token-expires-at', `${Date.now() + tokenExpiry}`);
+    if (expiresAtResult.Version > 0) {
+        failures.push('Failed to update token expiry');
+    }
 
-    return tokens.access_token;
+    const accessTokenResult = await putSSMParameter('xero-access-token', tokens.access_token, true);
+    if (accessTokenResult.Version > 0) {
+        failures.push('Failed to update access token');
+    }
+
+    const refreshResult = await putSSMParameter('xero-api-refresh-token', tokens.refresh_token, true);
+    if (refreshResult.Version > 0) {
+        failures.push('Failed to update refresh token');
+    }
+
+    if (failures.length) {
+        throw new Error(`Failed to update token store:\n- ${failures.join('\n- ')}`);
+    }
+
+    console.log('Xero access token refreshed');
 }
 
 // #endregion
