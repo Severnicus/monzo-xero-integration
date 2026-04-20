@@ -54,7 +54,7 @@ function mapToXeroBankTransaction(tx) {
 
     const direction = tx.amount < 0 ? 'SPEND' : 'RECEIVE';
     const absoluteAmount = Math.abs(tx.amount) / 100;
-    const contactName = tx.merchant?.name || tx.description || 'Unknown';
+    const contactName = tx.merchant.name;
     const date = tx.created ? tx.created.substring(0, 10) : new Date().toISOString().substring(0, 10);
 
     return {
@@ -80,7 +80,7 @@ function mapToXeroBankTransaction(tx) {
 
 function buildLineItemDescription(tx) {
     const parts = [tx.description];
-    if (tx.merchant?.name && tx.merchant.name !== tx.description) {
+    if (tx.merchant.name !== tx.description) {
         parts.push(`Merchant: ${tx.merchant.name}`);
     }
     if (tx.category) {
