@@ -98,7 +98,10 @@ async function getXeroAccessToken() {
     const accessToken = await getSSMParameter('xero-access-token', true);
     const expiresAt = Number(await getSSMParameter('xero-access-token-expires-at'));
 
+    console.log(`Access token expires at: ${new Date(expiresAt).toString()}`);
+
     if (accessToken && Date.now() < expiresAt - ACCESS_TOKEN_TTL_BUFFER) {
+        console.log('Xero access token valid — skipping refresh');
         return accessToken;
     }
 
@@ -124,11 +127,11 @@ async function getXeroAccessToken() {
     const tokens = await tokenResponse.json();
     console.log('Xero access token refreshed');
 
+    await putSSMParameter('xero-access-token', tokens.access_token, true);
     await putSSMParameter('xero-api-refresh-token', tokens.refresh_token, true);
 
     // expires_in always expressed in seconds according to Xero's API docs
     const tokenExpiry = tokens.expires_in * 1000;
-
     await putSSMParameter('xero-access-token-expires-at', `${Date.now() + tokenExpiry}`);
 
     console.log('Xero refresh token updated in SSM');
