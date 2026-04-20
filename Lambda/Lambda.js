@@ -188,9 +188,7 @@ async function sendNotificationEmail(error, xeroPayload) {
         return;
     }
 
-    const amount = xeroPayload.LineItems[0].UnitAmount;
-    const direction = xeroPayload.Type === 'SPEND' ? 'spent' : 'received';
-    const subject = `Monzo-Xero - Failed to send transaction: £${amount} ${direction} — ${xeroPayload.Contact.Name}`;
+    const subject = `Monzo-Xero - Failed to send transaction`;
     const bodyText = [
         `Error: ${error.message}`,
         error.stack ? `Stack:\n${error.stack}` : '',
