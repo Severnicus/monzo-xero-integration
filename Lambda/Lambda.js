@@ -3,12 +3,13 @@ import { SSMClient, GetParameterCommand, PutParameterCommand } from '@aws-sdk/cl
 
 // Email service
 const ses = new SESClient();
-// Secret service
+// Systems manager parameter store
 const ssm = new SSMClient();
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL;
 const SENDER_EMAIL = process.env.SENDER_EMAIL;
 const XERO_BANK_ACCOUNT_CODE = process.env.XERO_BANK_ACCOUNT_CODE;
 const XERO_ACCOUNT_CODE = process.env.XERO_ACCOUNT_CODE;
+const ACCESS_TOKEN_TTL_BUFFER = 300000; 
 
 export const handler = async (event) => {
     console.log('Received event');
@@ -94,10 +95,16 @@ async function putSSMParameter(name, value, secure = false) {
 }
 
 async function getXeroAccessToken() {
+    const accessToken = await getSSMParameter('xero-access-token', true);
+    const expiresAt = Number(await getSSMParameter('xero-access-token-expires-at'));
+
+    if (accessToken && Date.now() < expiresAt - ACCESS_TOKEN_TTL_BUFFER) {
+        return accessToken;
+    }
+
     const clientId = await getSSMParameter('xero-api-username');
     const clientSecret = await getSSMParameter('xero-api-password', true);
     const refreshToken = await getSSMParameter('xero-api-refresh-token', true);
-
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
     const tokenResponse = await fetch('https://identity.xero.com/connect/token', {
@@ -118,6 +125,12 @@ async function getXeroAccessToken() {
     console.log('Xero access token refreshed');
 
     await putSSMParameter('xero-api-refresh-token', tokens.refresh_token, true);
+
+    // expires_in always expressed in seconds according to Xero's API docs
+    const tokenExpiry = tokens.expires_in * 1000;
+
+    await putSSMParameter('xero-access-token-expires-at', `${Date.now() + tokenExpiry}`);
+
     console.log('Xero refresh token updated in SSM');
 
     return tokens.access_token;
