@@ -26,8 +26,9 @@ export const handler = async (event) => {
 
         const transaction = body.data;
         xeroPayload = mapToXeroBankTransaction(transaction);
-        const xeroResult = await sendToXero(xeroPayload);
-        console.log('Xero result:', JSON.stringify(xeroResult, null, 2));
+
+        // xeroPayload does not contain PII
+        await sendToXero(xeroPayload);
 
         return response(200, { message: 'Transaction processed', transactionId: transaction.id });
     } catch (error) {
@@ -38,6 +39,18 @@ export const handler = async (event) => {
 };
 
 function mapToXeroBankTransaction(tx) {
+    if (tx == null){
+        throw new Error('Invalid transaction: missing transaction data');
+    }
+
+    if (!Number.isFinite(tx.amount)) {
+        throw new Error(`Invalid transaction: amount must be a valid number: ${tx.amount}`);
+    }
+
+    if (!tx.merchant?.name?.trim()) {
+        throw new Error('Invalid transaction: merchant name must not be empty or whitespace');
+    }
+
     const direction = tx.amount < 0 ? 'SPEND' : 'RECEIVE';
     const absoluteAmount = Math.abs(tx.amount) / 100;
     const contactName = tx.merchant?.name || tx.description || 'Unknown';
@@ -121,7 +134,7 @@ async function getXeroAccessToken() {
 
     if (!tokenResponse.ok) {
         const errorBody = await tokenResponse.text();
-        throw new Error(`Xero token refresh failed (${tokenResponse.status}): ${errorBody}`);
+           throw new Error(`Xero token refresh failed (${tokenResponse.status}): ${errorBody}`);
     }
 
     const tokens = await tokenResponse.json();
